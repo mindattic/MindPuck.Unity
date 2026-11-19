@@ -1,0 +1,17 @@
+{
+  "name": "MindPuck.Game",
+  "rootNamespace": "MindPuck.Game",
+  "references": [
+    "MindPuck.Core",
+    "MindAttic.EyeTracker"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

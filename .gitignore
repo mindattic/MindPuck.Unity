@@ -1,0 +1,43 @@
+# Unity-generated folders
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+/TestResults*.xml
+/Screenshots/
+
+# IDE files Unity regenerates
+*.csproj
+*.sln
+*.slnx
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.unityproj
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+.vs/
+.idea/
+.vscode/
+.consulo/
+
+# Logs and crash reports
+*.log
+crashlytics-buildid.txt
+sysinfo.txt
+
+# Test output
+TestResults/
+
+# Artifacts: only the committed HTML copies (HOUSE-LAW-12)
+/artifacts/*
+!/artifacts/*.html
