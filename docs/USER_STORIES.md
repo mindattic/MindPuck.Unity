@@ -22,4 +22,4 @@ _Nothing recorded yet._
 | ID | Date | Type | Status | Summary | Ref |
 |---|---|---|---|---|---|
 | MPU-T1 | 2026-11-19 | docs | closed | Start the permanent ticket log in the ticket database | — |
-| MPU-T2 | 2026-11-19 | feature | open | Unity version of MindPuck on the EyeTracker Unity client (MAT-T160) | — |
+| MPU-T2 | 2026-11-19 | feature | closed | Unity version of MindPuck on the EyeTracker Unity client (MAT-T160) | d6caf79 |
