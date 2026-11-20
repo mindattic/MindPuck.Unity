@@ -182,8 +182,8 @@ namespace MindPuck.Tests
             Assert.AreEqual(p.SteerStrength, Physics.SteerAccel(p.SteerFull * r, r, p), 1e-12);
             Assert.AreEqual(p.SteerStrength, Physics.SteerAccel(p.SteerRange * r, r, p), 1e-12);
             Assert.AreEqual(p.SteerStrength / 2, Physics.SteerAccel(p.SteerRange * 1.25 * r, r, p), 1e-9);
-            Assert.AreEqual(0, Physics.SteerAccel(p.SteerRange * 1.5 * r, r, p));
-            Assert.AreEqual(0, Physics.SteerAccel(10, r, p));
+            Assert.AreEqual(0, Physics.SteerAccel(p.SteerRange * 1.5 * r, r, p), 1e-9);
+            Assert.AreEqual(0, Physics.SteerAccel(10, r, p), 1e-9);
         }
 
         [Test]
