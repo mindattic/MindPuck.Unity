@@ -41,10 +41,38 @@ namespace MindPuck.Editor
             PlayerSettings.companyName = "MindAttic";
             PlayerSettings.productName = "MindPuck";
             PlayerSettings.runInBackground = true;
+            PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
+            PlayerSettings.defaultScreenWidth = 1280;
+            PlayerSettings.defaultScreenHeight = 720;
+            PlayerSettings.resizableWindow = true;
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log("MindPuck: project set up. Scene saved to " + ScenePath);
+        }
+
+        public const string WindowsPlayer = "Build/Windows/MindPuck.exe";
+
+        /// <summary>
+        /// Build the Windows player into Build/Windows (ignored by git). From a shell:
+        ///   Unity.exe -batchmode -quit -projectPath . -executeMethod MindPuck.Editor.ProjectSetup.BuildWindows -logFile build.log
+        /// </summary>
+        [MenuItem("MindPuck/Build Windows Player")]
+        public static void BuildWindows()
+        {
+            var options = new BuildPlayerOptions
+            {
+                scenes = new[] { ScenePath },
+                locationPathName = WindowsPlayer,
+                target = BuildTarget.StandaloneWindows64,
+                options = BuildOptions.None,
+            };
+            UnityEditor.Build.Reporting.BuildReport report = BuildPipeline.BuildPlayer(options);
+            if (report.summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded)
+            {
+                throw new IOException("MindPuck: the Windows build failed: " + report.summary.result + ", " + report.summary.totalErrors + " errors");
+            }
+            Debug.Log("MindPuck: built " + WindowsPlayer + " (" + report.summary.totalSize + " bytes)");
         }
 
         private static void EnsureMaterial(string name, string shaderName)

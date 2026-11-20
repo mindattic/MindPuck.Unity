@@ -14,7 +14,7 @@ namespace MindPuck.Game
     /// </summary>
     public sealed class TableView : MonoBehaviour
     {
-        private const float WallHeight = 0.5f;
+        private const float WallHeight = 0.4f;
         private const float RailWidth = 0.45f;
         private const float PuckHeight = 0.2f;
 
@@ -64,7 +64,7 @@ namespace MindPuck.Game
             double h = Level.ArenaH;
             double rail = RailWidth;
 
-            Part("Surface", transform, MeshBuilder.Flat(Outline(Geometry.RectPolygon(w / 2, h / 2, w / 2, h / 2)), 0f), GameMaterials.Lit(SurfaceColor, 0.6f), true);
+            Part("Surface", transform, MeshBuilder.Flat(Outline(Geometry.RectPolygon(w / 2, h / 2, w / 2, h / 2)), 0f), GameMaterials.Lit(SurfaceColor, 0.25f), true);
             Material railMaterial = GameMaterials.Lit(RailColor);
             Vec[][] rails =
             {

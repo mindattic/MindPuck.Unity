@@ -85,14 +85,128 @@ namespace MindPuck.Game
             calibrator = gaze.AddComponent<GazeCalibrator>();
             calibrator.tracker = tracker;
             calibrator.Completed += OnCalibrated;
+            tracker.Sample += OnSample;
             gaze.SetActive(true);
 
+            ReadArguments();
             LoadLevel(startLevel);
+        }
+
+        // ---- diagnostics ----
+        //
+        // Command-line switches for checking a player build without a person at the keyboard:
+        //   -mindpuck-bot                  start with the bot demo on
+        //   -mindpuck-calibrate            start a calibration as soon as a tracker sends gaze
+        //   -mindpuck-level <n>            start on level n (counted from one)
+        //   -mindpuck-shot <file.png>      save a screenshot, then quit
+        //   -mindpuck-shot-after <seconds> when to take it (default 5)
+        //   -mindpuck-quit-after <seconds> quit after this long, with or without a screenshot
+        // The game also logs one line when the tracker count changes, when the first gaze sample
+        // arrives, when a calibration ends and on each win. Every line starts with "MindPuck:".
+
+        private string shotPath;
+        private float shotAfter = 5f;
+        private float quitAfter = -1f;
+        private bool shotTaken;
+        private float quitAt = -1f;
+        private bool calibrateAtLaunch;
+        private float startedAt;
+        private int lastTrackers = -1;
+        private bool lastConnected;
+        private bool firstSampleLogged;
+
+        private void ReadArguments()
+        {
+            startedAt = Time.realtimeSinceStartup;
+            string[] args = Environment.GetCommandLineArgs();
+            var invariant = System.Globalization.CultureInfo.InvariantCulture;
+            for (int i = 0; i < args.Length; i++)
+            {
+                string next = i + 1 < args.Length ? args[i + 1] : null;
+                float seconds;
+                int number;
+                switch (args[i])
+                {
+                    case "-mindpuck-bot":
+                        botMode = true;
+                        break;
+                    case "-mindpuck-calibrate":
+                        calibrateAtLaunch = true;
+                        break;
+                    case "-mindpuck-level":
+                        if (next != null && int.TryParse(next, System.Globalization.NumberStyles.Integer, invariant, out number)) startLevel = Mathf.Max(0, number - 1);
+                        break;
+                    case "-mindpuck-shot":
+                        shotPath = next;
+                        break;
+                    case "-mindpuck-shot-after":
+                        if (next != null && float.TryParse(next, System.Globalization.NumberStyles.Float, invariant, out seconds)) shotAfter = seconds;
+                        break;
+                    case "-mindpuck-quit-after":
+                        if (next != null && float.TryParse(next, System.Globalization.NumberStyles.Float, invariant, out seconds)) quitAfter = seconds;
+                        break;
+                }
+            }
+        }
+
+        private void Diagnose()
+        {
+            GazeBridgeClient client = tracker.Client;
+            bool connected = client != null && client.Connected;
+            int trackers = client != null ? client.Trackers : 0;
+            if (trackers != lastTrackers || connected != lastConnected)
+            {
+                lastTrackers = trackers;
+                lastConnected = connected;
+                if (trackers == 0) firstSampleLogged = false;
+                Debug.Log("MindPuck: bridge " + (connected ? "connected" : "not connected") + ", trackers " + trackers);
+            }
+
+            if (calibrateAtLaunch && firstSampleLogged && !calibrator.IsRunning)
+            {
+                calibrateAtLaunch = false;
+                Debug.Log("MindPuck: calibration started");
+                calibrator.Begin(true);
+            }
+
+            float elapsed = Time.realtimeSinceStartup - startedAt;
+            if (shotPath != null && !shotTaken && elapsed >= shotAfter)
+            {
+                shotTaken = true;
+                ScreenCapture.CaptureScreenshot(shotPath);
+                Debug.Log("MindPuck: screenshot " + shotPath);
+                // The file is written at the end of the frame; leave a moment before quitting.
+                quitAt = Time.realtimeSinceStartup + 1f;
+            }
+            if (quitAfter >= 0f && quitAt < 0f && elapsed >= quitAfter && (shotPath == null || shotTaken)) quitAt = Time.realtimeSinceStartup;
+            if (quitAt >= 0f && Time.realtimeSinceStartup >= quitAt)
+            {
+                quitAt = float.MaxValue;
+                Debug.Log("MindPuck: quitting");
+                Application.Quit();
+            }
+        }
+
+        private void OnSample(GazeSample sample)
+        {
+            if (firstSampleLogged || tracker.UsingMouse) return;
+            firstSampleLogged = true;
+            var invariant = System.Globalization.CultureInfo.InvariantCulture;
+            Debug.Log("MindPuck: first gaze sample x " + sample.x.ToString("0.000", invariant) + " y " + sample.y.ToString("0.000", invariant) +
+                " confidence " + sample.confidence.ToString("0.00", invariant) + " face " + sample.face + " blink " + sample.blink +
+                " calibrated " + sample.calibrated);
+        }
+
+        private string Source()
+        {
+            if (bot != null) return "bot";
+            return tracker.UsingMouse ? "mouse" : "gaze";
         }
 
         private void OnDestroy()
         {
             if (calibrator != null) calibrator.Completed -= OnCalibrated;
+            if (tracker != null) tracker.Sample -= OnSample;
             if (dotTexture != null) Destroy(dotTexture);
         }
 
@@ -120,10 +234,11 @@ namespace MindPuck.Game
         private void FitCamera()
         {
             fittedAspect = cam.aspect;
-            const float tilt = 9f;
+            const float tilt = 5f;
             Vector3 back = Quaternion.Euler(-tilt, 0f, 0f) * Vector3.up;
             float halfW = (float)Level.ArenaW / 2 + 0.75f;
-            float halfH = (float)Level.ArenaH / 2 + 0.75f;
+            // Extra room above and below keeps the HUD lines off the table.
+            float halfH = (float)Level.ArenaH / 2 + 1.25f;
             Vector3[] corners =
             {
                 new Vector3(-halfW, 0f, -halfH),
@@ -218,6 +333,7 @@ namespace MindPuck.Game
         private void Update()
         {
             if (Mathf.Abs(cam.aspect - fittedAspect) > 0.001f) FitCamera();
+            Diagnose();
 
             if (pending != null && pending.IsCompleted) FinishLoading();
 
@@ -272,6 +388,9 @@ namespace MindPuck.Game
                 {
                     state = State.Won;
                     goalLeft = GoalSeconds;
+                    var invariant = System.Globalization.CultureInfo.InvariantCulture;
+                    Debug.Log("MindPuck: win level " + (levelIndex + 1) + " time " + sim.Time.ToString("0.00", invariant) +
+                        " par " + level.Par.ToString("0.0", invariant) + " source " + Source());
                 }
             }
 
@@ -314,6 +433,10 @@ namespace MindPuck.Game
                 ? "calibrated, error about " + Mathf.RoundToInt(result.crossError * 100f) + "% of the screen"
                 : "calibration failed: " + (string.IsNullOrEmpty(result.reason) ? "unknown reason" : result.reason);
             calibrationNoteUntil = Time.unscaledTime + 6f;
+            var invariant = System.Globalization.CultureInfo.InvariantCulture;
+            Debug.Log("MindPuck: calibration result ok " + result.ok + " targets " + result.targets + " samples " + result.samples +
+                " fitError " + result.fitError.ToString("0.000", invariant) + " crossError " + result.crossError.ToString("0.000", invariant) +
+                (string.IsNullOrEmpty(result.reason) ? "" : " reason " + result.reason));
             // Start the attempt again: the puck has been sitting under a calibration screen.
             StartAttempt();
         }

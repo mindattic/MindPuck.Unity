@@ -115,6 +115,33 @@ The scene, the two template materials and the build settings come from
 Unity.exe -batchmode -quit -projectPath D:\Projects\MindAttic\MindPuck.Unity -executeMethod MindPuck.Editor.ProjectSetup.CreateScene -logFile setup.log
 ```
 
+### Building and checking a player
+
+`MindPuck.Editor.ProjectSetup.BuildWindows` (menu **MindPuck > Build Windows Player**) builds
+`Build/Windows/MindPuck.exe`. `Build/` is ignored by git.
+
+```
+Unity.exe -batchmode -quit -projectPath D:\Projects\MindAttic\MindPuck.Unity -executeMethod MindPuck.Editor.ProjectSetup.BuildWindows -logFile build.log
+```
+
+The player takes a few switches for checking it without a person at the keyboard:
+
+| Switch | Does |
+| --- | --- |
+| `-mindpuck-bot` | Start with the bot demo on |
+| `-mindpuck-calibrate` | Start a calibration as soon as a tracker sends gaze |
+| `-mindpuck-level <n>` | Start on level n, counted from one |
+| `-mindpuck-shot <file.png>` | Save a screenshot, then quit |
+| `-mindpuck-shot-after <seconds>` | When to take it (default 5) |
+| `-mindpuck-quit-after <seconds>` | Quit after this long |
+
+The game logs one line, starting `MindPuck:`, when the tracker count changes, when the first gaze
+sample arrives, when a calibration ends, and on each win. For example:
+
+```
+Build\Windows\MindPuck.exe -screen-width 1280 -screen-height 720 -screen-fullscreen 0 -logFile run.log -mindpuck-bot -mindpuck-shot shot.png -mindpuck-shot-after 4
+```
+
 ## Tests
 
 `Assets/MindPuck/Tests` holds NUnit EditMode tests for the core: the random sequence against known
