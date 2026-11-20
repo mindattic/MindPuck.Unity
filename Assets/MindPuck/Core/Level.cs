@@ -44,8 +44,16 @@ namespace MindPuck.Core
         public double CupAngle;
         /// <summary>Everything the puck bounces off, the walls of the cup included.</summary>
         public Vec[][] Obstacles;
-        /// <summary>How long the solver took to win, in seconds. Shown to the player as the time to beat.</summary>
+        /// <summary>How long the solver took to win in repulsor mode, in seconds. Shown to the player as the time to beat.</summary>
         public double Par;
+        /// <summary>The same for magnetic mode.</summary>
+        public double ParAttract;
+
+        /// <summary>The time to beat in the given mode.</summary>
+        public double ParFor(GazeMode mode)
+        {
+            return mode == GazeMode.Attract ? ParAttract : Par;
+        }
         /// <summary>How many candidates were generated before one passed the solver.</summary>
         public int Attempts;
     }

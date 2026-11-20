@@ -34,6 +34,10 @@ namespace MindPuck.Game
         private Material wallMaterial;
         private Material padMaterial;
         private Material reticleMaterial;
+        private Transform reticleDot;
+        private readonly Transform[] reticleRings = new Transform[2];
+        private readonly Material[] ringMaterials = new Material[2];
+        private static readonly Color PullColor = new Color(1f, 0.45f, 0.75f);
 
         public static Vector3 ToWorld(Vec p, float height = 0f)
         {
@@ -94,12 +98,18 @@ namespace MindPuck.Game
             Part("Body", puck, MeshBuilder.Extrude(MeshBuilder.Circle(puckRadius, 48), 0f, PuckHeight), GameMaterials.Lit(PuckColor, 0.7f), true);
             Part("Top", puck, MeshBuilder.Ring(puckRadius * 0.45f, puckRadius * 0.62f, 48, PuckHeight + 0.002f), GameMaterials.Glow(new Color(0.35f, 0.2f, 0.02f, 0.8f), 2), false);
 
-            // The reticle marks the point the push comes from.
+            // The reticle marks the gaze point. Its rings travel outward when the gaze pushes (repulsor)
+            // and inward when it pulls (magnetic).
             reticle = new GameObject("Reticle").transform;
             reticle.SetParent(transform, false);
-            reticleMaterial = GameMaterials.Glow(ReticleColor, 10);
-            Part("Ring", reticle, MeshBuilder.Ring(0.3f, 0.36f, 48, 0.012f), reticleMaterial, false);
-            Part("Dot", reticle, MeshBuilder.Flat(MeshBuilder.Circle(0.07f, 24), 0.012f), reticleMaterial, false);
+            reticleMaterial = GameMaterials.Glow(ReticleColor, 12);
+            Mesh ringMesh = MeshBuilder.Ring(0.44f, 0.5f, 48, 0.012f);
+            for (int i = 0; i < reticleRings.Length; i++)
+            {
+                ringMaterials[i] = GameMaterials.Glow(ReticleColor, 10 + i);
+                reticleRings[i] = Part("Ring", reticle, ringMesh, ringMaterials[i], false).transform;
+            }
+            reticleDot = Part("Dot", reticle, MeshBuilder.Flat(MeshBuilder.Circle(0.1f, 24), 0.012f), reticleMaterial, false).transform;
             reticle.gameObject.SetActive(false);
         }
 
@@ -149,13 +159,31 @@ namespace MindPuck.Game
             padMaterial.color = new Color(GoalColor.r, GoalColor.g, GoalColor.b, Mathf.Lerp(0.22f, 0.7f, Mathf.Clamp01(progress)));
         }
 
-        /// <summary>Show the reticle at a table point, or hide it with null. A faint one means it is not pushing.</summary>
-        public void SetReticle(Vec? point, bool pushing)
+        /// <summary>
+        /// Show the reticle at a table point, or hide it with null. A faint one means the gaze is not
+        /// acting on the puck. Repulsor: blue rings moving outward. Magnetic: pink rings moving inward
+        /// and a smaller dot.
+        /// </summary>
+        public void SetReticle(Vec? point, bool acting, GazeMode mode)
         {
             reticle.gameObject.SetActive(point.HasValue);
             if (!point.HasValue) return;
             reticle.localPosition = ToWorld(point.Value);
-            reticleMaterial.color = new Color(ReticleColor.r, ReticleColor.g, ReticleColor.b, pushing ? 0.95f : 0.35f);
+            bool pull = mode == GazeMode.Attract;
+            Color colour = pull ? PullColor : ReticleColor;
+            float strength = acting ? 1f : 0.35f;
+            reticleMaterial.color = new Color(colour.r, colour.g, colour.b, 0.95f * strength);
+            float dot = pull ? 0.6f : 1f;
+            reticleDot.localScale = new Vector3(dot, 1f, dot);
+            for (int i = 0; i < reticleRings.Length; i++)
+            {
+                // Each ring runs from the centre to the rim (or back), fading as it goes out.
+                float phase = Mathf.Repeat(Time.unscaledTime * 0.9f + (float)i / reticleRings.Length, 1f);
+                float travel = pull ? 1f - phase : phase;
+                float scale = Mathf.Lerp(0.35f, 1.6f, travel);
+                reticleRings[i].localScale = new Vector3(scale, 1f, scale);
+                ringMaterials[i].color = new Color(colour.r, colour.g, colour.b, Mathf.Lerp(0.95f, 0.1f, travel) * strength);
+            }
         }
 
         private void OnDestroy()

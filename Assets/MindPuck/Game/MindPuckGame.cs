@@ -19,6 +19,7 @@ namespace MindPuck.Game
         /// </summary>
         public const float HoldSeconds = 0.9f;
         private const float GoalSeconds = 1.6f;
+        private const string ModeKey = "mindpuck.mode";
         private const string TrackerPage = "http://localhost:8787/tracker/";
 
         [Tooltip("The EyeTracker bridge.")]
@@ -51,6 +52,8 @@ namespace MindPuck.Game
         private PuckSim sim;
         private SolverBot bot;
         private bool botMode;
+        /// <summary>Magnetic (attract) is the default. F1 switches; the choice is remembered in PlayerPrefs.</summary>
+        private GazeMode mode = GazeMode.Attract;
         private double botAccumulator;
         private float holdLeft;
         private float goalLeft;
@@ -88,6 +91,7 @@ namespace MindPuck.Game
             tracker.Sample += OnSample;
             gaze.SetActive(true);
 
+            if (PlayerPrefs.GetString(ModeKey, "attract") == "repel") mode = GazeMode.Repel;
             ReadArguments();
             LoadLevel(startLevel);
         }
@@ -96,6 +100,7 @@ namespace MindPuck.Game
         //
         // Command-line switches for checking a player build without a person at the keyboard:
         //   -mindpuck-bot                  start with the bot demo on
+        //   -mindpuck-mode attract|repel   play magnetic or repulsor this run (not remembered)
         //   -mindpuck-calibrate            start a calibration as soon as a tracker sends gaze
         //   -mindpuck-level <n>            start on level n (counted from one)
         //   -mindpuck-shot <file.png>      save a screenshot, then quit
@@ -129,6 +134,10 @@ namespace MindPuck.Game
                 {
                     case "-mindpuck-bot":
                         botMode = true;
+                        break;
+                    case "-mindpuck-mode":
+                        if (next == "attract") mode = GazeMode.Attract;
+                        else if (next == "repel") mode = GazeMode.Repel;
                         break;
                     case "-mindpuck-calibrate":
                         calibrateAtLaunch = true;
@@ -314,12 +323,13 @@ namespace MindPuck.Game
         {
             if (level == null) return;
             sim.Reset();
+            sim.Mode = mode;
             botAccumulator = 0;
             bot = null;
             if (botMode)
             {
-                // The same noise seed the generator used when it proved this level, so the demo is the proof.
-                BotOptions options = BotOptions.Default.WithSeed(Rng.MixSeed(level.Seed, level.Index, 1000 + level.Attempts - 1));
+                // The same noise seed and mode the generator used when it proved this level, so the demo is the proof.
+                BotOptions options = BotOptions.Default.With(Rng.MixSeed(level.Seed, level.Index, 1000 + level.Attempts - 1), mode);
                 bot = new SolverBot(level, sim.Params, options);
             }
             holdLeft = HoldSeconds;
@@ -390,7 +400,7 @@ namespace MindPuck.Game
                     goalLeft = GoalSeconds;
                     var invariant = System.Globalization.CultureInfo.InvariantCulture;
                     Debug.Log("MindPuck: win level " + (levelIndex + 1) + " time " + sim.Time.ToString("0.00", invariant) +
-                        " par " + level.Par.ToString("0.0", invariant) + " source " + Source());
+                        " par " + level.ParFor(mode).ToString("0.0", invariant) + " mode " + (mode == GazeMode.Attract ? "attract" : "repel") + " source " + Source());
                 }
             }
 
@@ -406,7 +416,7 @@ namespace MindPuck.Game
                 table.SetGoalProgress(state == State.Won ? 1f : (float)(sim.Dwell / sim.Params.Dwell));
             }
             bool pushing = gaze.HasValue && state == State.Playing && holdLeft <= 0f && !paused;
-            table.SetReticle(paused ? null : shown, pushing);
+            table.SetReticle(paused ? null : shown, pushing, mode);
             reticleVisible = shown.HasValue && !paused;
             if (reticleVisible)
             {
@@ -457,6 +467,9 @@ namespace MindPuck.Game
                     botMode = !botMode;
                     StartAttempt();
                     break;
+                case KeyCode.F1:
+                    ToggleMode();
+                    break;
                 case KeyCode.C:
                     calibrator.Begin();
                     break;
@@ -464,6 +477,20 @@ namespace MindPuck.Game
                     tracker.useMouseFallback = !tracker.useMouseFallback;
                     break;
             }
+        }
+
+        /// <summary>Switch between magnetic and repulsor, remember it, and start the attempt again.</summary>
+        private void ToggleMode()
+        {
+            mode = mode == GazeMode.Attract ? GazeMode.Repel : GazeMode.Attract;
+            PlayerPrefs.SetString(ModeKey, mode == GazeMode.Attract ? "attract" : "repel");
+            PlayerPrefs.Save();
+            calibrationNote = mode == GazeMode.Attract
+                ? "Magnetic: the puck goes to where you look."
+                : "Repulsor: the puck is pushed away from where you look.";
+            calibrationNoteUntil = Time.unscaledTime + 4f;
+            Debug.Log("MindPuck: mode " + (mode == GazeMode.Attract ? "attract" : "repel"));
+            StartAttempt();
         }
 
         private string SourceStatus()
@@ -509,8 +536,9 @@ namespace MindPuck.Game
             string top = "Level " + shownLevel;
             if (sim != null && state != State.Loading)
             {
-                top += "    Time " + sim.Time.ToString("0.0") + " s    Par " + level.Par.ToString("0.0") + " s";
+                top += "    Time " + sim.Time.ToString("0.0") + " s    Par " + level.ParFor(mode).ToString("0.0") + " s";
             }
+            top += "    " + (mode == GazeMode.Attract ? "Magnetic" : "Repulsor");
             Shadowed(new Rect(pad, pad, width, line), top, hudStyle, Color.white);
             Shadowed(new Rect(pad, pad + line, width, line), SourceStatus(), hintStyle, new Color(0.75f, 0.85f, 1f));
             if (calibrationNote != null && Time.unscaledTime < calibrationNoteUntil)
@@ -518,7 +546,7 @@ namespace MindPuck.Game
                 Shadowed(new Rect(pad, pad + line * 2f, width, line), calibrationNote, hintStyle, new Color(0.75f, 0.85f, 1f));
             }
 
-            string hints = "R restart    N skip    B bot demo " + (botMode ? "(on)" : "(off)") +
+            string hints = "F1 " + (mode == GazeMode.Attract ? "repulsor" : "magnetic") + "    R restart    N skip    B bot demo " + (botMode ? "(on)" : "(off)") +
                 "    C calibrate    M mouse stand-in " + (tracker.useMouseFallback ? "(on)" : "(off)");
             Shadowed(new Rect(pad, Screen.height - pad - line, width, line), hints, hintStyle, new Color(1f, 1f, 1f, 0.75f));
 
@@ -532,11 +560,14 @@ namespace MindPuck.Game
             else if (state == State.Won)
             {
                 Shadowed(centre, "GOAL", bigStyle, new Color(0.3f, 0.95f, 0.6f));
-                Shadowed(below, sim.Time.ToString("0.0") + " s  (par " + level.Par.ToString("0.0") + " s)", CentredHud(), Color.white);
+                Shadowed(below, sim.Time.ToString("0.0") + " s  (par " + level.ParFor(mode).ToString("0.0") + " s)", CentredHud(), Color.white);
             }
             else if (holdLeft > 0f)
             {
-                Shadowed(below, "Look where you do not want the puck to go", CentredHud(), new Color(1f, 1f, 1f, 0.8f));
+                string how = mode == GazeMode.Attract
+                    ? "Look where you want the puck to go. F1 switches to the repulsor."
+                    : "Look behind the puck to push it. Look far away to let it glide. F1 switches to magnetic.";
+                Shadowed(below, how, CentredHud(), new Color(1f, 1f, 1f, 0.8f));
             }
 
             // A small dot at the exact gaze point, on top of everything, walls included.
@@ -544,7 +575,7 @@ namespace MindPuck.Game
             {
                 float size = 10f * scale;
                 Color old = GUI.color;
-                GUI.color = new Color(0.5f, 0.83f, 1f, 0.9f);
+                GUI.color = mode == GazeMode.Attract ? new Color(1f, 0.45f, 0.75f, 0.9f) : new Color(0.5f, 0.83f, 1f, 0.9f);
                 GUI.DrawTexture(new Rect(reticleScreen.x - size / 2, reticleScreen.y - size / 2, size, size), dotTexture);
                 GUI.color = old;
             }

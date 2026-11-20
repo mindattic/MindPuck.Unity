@@ -114,11 +114,61 @@ namespace MindPuck.Tests
         public void Gaze_PushesThePuckAway()
         {
             var sim = new PuckSim(OpenLevel());
+            sim.Mode = GazeMode.Repel;
             // Looking just left of the puck sends it right.
             for (int i = 0; i < 30; i++) sim.Step(new Vec(1, 4.5));
             Assert.Greater(sim.Vel.X, 0);
             Assert.AreEqual(0, sim.Vel.Y, 1e-9);
             Assert.Greater(sim.Pos.X, 2);
+        }
+
+        [Test]
+        public void PullAccel_RisesLikeASpringThenHoldsSteady()
+        {
+            PhysicsParams p = PhysicsParams.Default;
+            Assert.AreEqual(0, Physics.PullAccel(0, p));
+            Assert.AreEqual(p.PullStrength / 2, Physics.PullAccel(p.PullSoftness / 2, p), 1e-12);
+            Assert.AreEqual(p.PullStrength, Physics.PullAccel(p.PullSoftness, p), 1e-12);
+            Assert.AreEqual(p.PullStrength, Physics.PullAccel(10, p), 1e-12);
+        }
+
+        [Test]
+        public void NewSim_IsMagneticAndTheBotDefaultsToRepel()
+        {
+            Assert.AreEqual(GazeMode.Attract, new PuckSim(OpenLevel()).Mode);
+            Assert.AreEqual(GazeMode.Repel, BotOptions.Default.Mode);
+            Assert.AreEqual(GazeMode.Attract, BotOptions.Default.With(5, GazeMode.Attract).Mode);
+        }
+
+        [Test]
+        public void Attract_PullsThePuckToTheGazeAndSettlesThere()
+        {
+            var sim = new PuckSim(OpenLevel());
+            sim.Mode = GazeMode.Attract;
+            var gaze = new Vec(6, 3);
+            sim.Step(gaze);
+            // The first push points from the puck (2, 4.5) toward the gaze point.
+            Assert.Greater(sim.Push.X, 0);
+            Assert.Less(sim.Push.Y, 0);
+            for (int i = 0; i < 120 * 6; i++) sim.Step(gaze);
+            Assert.Less(Geometry.Dist(sim.Pos, gaze), 0.1);
+            Assert.Less(Geometry.Hypot(sim.Vel.X, sim.Vel.Y), 0.2);
+        }
+
+        [Test]
+        public void Attract_AddsPullDragOnlyWhileAGazeIsPresent()
+        {
+            PhysicsParams p = PhysicsParams.Default;
+            // The gaze sits on the puck, so there is no pull, only the extra drag.
+            var held = new PuckSim(OpenLevel());
+            held.Vel = new Vec(5, 0);
+            held.Step(new Vec(2, 4.5));
+            Assert.AreEqual(5 * Math.Exp(-(p.Drag + p.PullDrag) * p.Dt) - p.Friction * p.Dt, held.Vel.X, 1e-9);
+
+            var free = new PuckSim(OpenLevel());
+            free.Vel = new Vec(5, 0);
+            free.Step(null);
+            Assert.AreEqual(5 * Math.Exp(-p.Drag * p.Dt) - p.Friction * p.Dt, free.Vel.X, 1e-9);
         }
 
         [Test]
@@ -287,6 +337,14 @@ namespace MindPuck.Tests
             SolveResult result = Solver.SolveLevel(level, PhysicsParams.Default, options, grid);
             Assert.IsTrue(result.Solved);
             Assert.AreEqual(level.Par, result.Time, 0.051);
+
+            // The same in magnetic mode, which has its own par.
+            Assert.Greater(level.ParAttract, 0);
+            SolveResult pulled = Solver.SolveLevel(level, PhysicsParams.Default, options.With(options.Seed, GazeMode.Attract), grid);
+            Assert.IsTrue(pulled.Solved);
+            Assert.AreEqual(level.ParAttract, pulled.Time, 0.051);
+            Assert.AreEqual(level.ParAttract, level.ParFor(GazeMode.Attract));
+            Assert.AreEqual(level.Par, level.ParFor(GazeMode.Repel));
         }
 
         [Test]
@@ -295,6 +353,7 @@ namespace MindPuck.Tests
             Level a = LevelGen.GenerateLevel(3, 4);
             Level b = LevelGen.GenerateLevel(3, 4);
             Assert.AreEqual(a.Par, b.Par);
+            Assert.AreEqual(a.ParAttract, b.ParAttract);
             Assert.AreEqual(a.Attempts, b.Attempts);
             Assert.AreEqual(a.Obstacles.Length, b.Obstacles.Length);
             Assert.AreEqual(a.Start.X, b.Start.X);

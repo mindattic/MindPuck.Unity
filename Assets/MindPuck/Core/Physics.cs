@@ -3,6 +3,16 @@ using System;
 
 namespace MindPuck.Core
 {
+    /// <summary>
+    /// What the gaze does to the puck. Attract (magnetic) pulls the puck to where you look.
+    /// Repel pushes it away: look where you do not want it to go.
+    /// </summary>
+    public enum GazeMode
+    {
+        Attract,
+        Repel,
+    }
+
     /// <summary>Every number that shapes how the table feels. MindPuck/docs/DESIGN.md explains each one.</summary>
     public sealed class PhysicsParams
     {
@@ -14,6 +24,12 @@ namespace MindPuck.Core
         public double RepelRange = 6;
         /// <summary>Looking at the very centre of the puck pushes nowhere; the push fades in over this fraction of its radius.</summary>
         public double DeadZone = 0.3;
+        /// <summary>Magnetic mode: the pull toward the gaze point once the puck is farther than PullSoftness away.</summary>
+        public double PullStrength = 14;
+        /// <summary>Magnetic mode: inside this distance the pull eases off in proportion, like a spring, so the puck settles on the gaze point.</summary>
+        public double PullSoftness = 1.5;
+        /// <summary>Magnetic mode: extra drag while the gaze holds the puck, which stops it circling the point it is pulled to.</summary>
+        public double PullDrag = 3.5;
         /// <summary>Air drag: the fraction of speed lost per second while gliding.</summary>
         public double Drag = 0.55;
         /// <summary>Drag on the goal pad, which is what lets the puck come to rest there.</summary>
@@ -57,6 +73,12 @@ namespace MindPuck.Core
             return core * reach * reach * centre;
         }
 
+        /// <summary>Magnetic mode: how hard the gaze pulls the puck from distance d. Zero when the puck is on the gaze point.</summary>
+        public static double PullAccel(double d, PhysicsParams p)
+        {
+            return p.PullStrength * Math.Min(d / p.PullSoftness, 1);
+        }
+
         /// <summary>The win radius: how close the centre of the puck must be to the centre of the goal.</summary>
         public static double WinRadius(Level level)
         {
@@ -70,6 +92,8 @@ namespace MindPuck.Core
     /// </summary>
     public sealed class PuckSim
     {
+        /// <summary>What the gaze does. It can be changed at any time, even mid-flight.</summary>
+        public GazeMode Mode = GazeMode.Attract;
         public Vec Pos;
         public Vec Vel;
         /// <summary>Seconds simulated since the last reset.</summary>
@@ -152,7 +176,8 @@ namespace MindPuck.Core
                 double d = Geometry.Hypot(dx, dy);
                 if (d > 1e-9)
                 {
-                    double a = Physics.RepelAccel(d, r, p);
+                    // Repel pushes along the line from the gaze point to the puck; attract pulls back along it.
+                    double a = Mode == GazeMode.Attract ? -Physics.PullAccel(d, p) : Physics.RepelAccel(d, r, p);
                     ax = (dx / d) * a;
                     ay = (dy / d) * a;
                 }
@@ -165,7 +190,8 @@ namespace MindPuck.Core
             double gx = Pos.X - lv.Goal.X;
             double gy = Pos.Y - lv.Goal.Y;
             double goalDist = Geometry.Hypot(gx, gy);
-            double damp = Math.Exp(-(goalDist < lv.Goal.R ? p.PadDrag : p.Drag) * dt);
+            bool held = gaze.HasValue && Mode == GazeMode.Attract;
+            double damp = Math.Exp(-((goalDist < lv.Goal.R ? p.PadDrag : p.Drag) + (held ? p.PullDrag : 0)) * dt);
             Vel.X *= damp;
             Vel.Y *= damp;
             double speed = Geometry.Hypot(Vel.X, Vel.Y);

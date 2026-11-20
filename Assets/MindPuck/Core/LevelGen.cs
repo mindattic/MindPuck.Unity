@@ -17,7 +17,7 @@ namespace MindPuck.Core
         /// <summary>
         /// Build level number index of the run identified by seed. Levels get harder as the index
         /// grows. Every level returned has been won by the solver bot (see Bot.cs), with an unsteady gaze,
-        /// so it is known to be possible; Par is the time the bot took.
+        /// in both gaze modes, so it is known to be possible; Par and ParAttract are the times the bot took.
         /// </summary>
         public static Level GenerateLevel(uint seed, int index, PhysicsParams parameters = null)
         {
@@ -40,10 +40,14 @@ namespace MindPuck.Core
         {
             var grid = new NavGrid(level);
             if (grid.FindPath(level.Start, level.Goal.Pos) == null) return false;
-            BotOptions options = BotOptions.Default.WithSeed(Rng.MixSeed(level.Seed, level.Index, 1000 + attempt));
-            SolveResult result = Solver.SolveLevel(level, parameters, options, grid);
+            // The level has to be winnable both ways the game can be played.
+            uint seed = Rng.MixSeed(level.Seed, level.Index, 1000 + attempt);
+            SolveResult result = Solver.SolveLevel(level, parameters, BotOptions.Default.With(seed, GazeMode.Repel), grid);
             if (!result.Solved) return false;
+            SolveResult pulled = Solver.SolveLevel(level, parameters, BotOptions.Default.With(seed, GazeMode.Attract), grid);
+            if (!pulled.Solved) return false;
             level.Par = Math.Floor(result.Time * 10 + 0.5) / 10;
+            level.ParAttract = Math.Floor(pulled.Time * 10 + 0.5) / 10;
             level.Attempts = attempt + 1;
             return true;
         }
@@ -148,6 +152,7 @@ namespace MindPuck.Core
                 CupAngle = cupAngle,
                 Obstacles = obstacles.ToArray(),
                 Par = 0,
+                ParAttract = 0,
                 Attempts = 0,
             };
         }

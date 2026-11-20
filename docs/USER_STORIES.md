@@ -23,3 +23,4 @@ _Nothing recorded yet._
 |---|---|---|---|---|---|
 | MPU-T1 | 2026-11-19 | docs | closed | Start the permanent ticket log in the ticket database | — |
 | MPU-T2 | 2026-11-19 | feature | closed | Unity version of MindPuck on the EyeTracker Unity client (MAT-T160) | d6caf79 |
+| MPU-T3 | 2026-11-19 | feature | open | Gaze now pulls the puck to where you look (magnetic) by default; F1 switches between magnetic and the original repulsor; levels are solver-verified in both modes | — |

@@ -16,9 +16,19 @@ namespace MindPuck.Core
         /// <summary>The speed the bot tries to travel at.</summary>
         public double Cruise = 3.2;
         public uint Seed = 1;
+        /// <summary>Which way the gaze acts in the game the bot is playing.</summary>
+        public GazeMode Mode = GazeMode.Repel;
 
         /// <summary>The shared defaults (DEFAULT_BOT in TS). Treat it as read-only.</summary>
         public static readonly BotOptions Default = new BotOptions();
+
+        /// <summary>A copy with another seed and mode: the TS spread { ...DEFAULT_BOT, seed, mode }.</summary>
+        public BotOptions With(uint seed, GazeMode mode)
+        {
+            BotOptions copy = WithSeed(seed);
+            copy.Mode = mode;
+            return copy;
+        }
 
         /// <summary>A copy with another seed: the TS spread { ...DEFAULT_BOT, seed }.</summary>
         public BotOptions WithSeed(uint seed)
@@ -31,6 +41,7 @@ namespace MindPuck.Core
                 TimeLimit = TimeLimit,
                 Cruise = Cruise,
                 Seed = seed,
+                Mode = Mode,
             };
         }
     }
@@ -130,6 +141,14 @@ namespace MindPuck.Core
             double toGoal = Geometry.Hypot(lv.Goal.X - pos.X, lv.Goal.Y - pos.Y);
             double speed = Geometry.Hypot(vel.X, vel.Y);
 
+            // Magnetic: simply look where the puck should go next. The pull does the rest.
+            if (options.Mode == GazeMode.Attract)
+            {
+                aim.X = target.X;
+                aim.Y = target.Y;
+                return;
+            }
+
             // Sitting on the pad: look away and let it settle.
             if (toGoal < Physics.WinRadius(lv) * 0.7 && speed < p.RestSpeed * 0.8)
             {
@@ -209,6 +228,7 @@ namespace MindPuck.Core
             parameters = parameters ?? PhysicsParams.Default;
             options = options ?? BotOptions.Default;
             var sim = new PuckSim(level, parameters);
+            sim.Mode = options.Mode;
             var bot = new SolverBot(level, parameters, options, grid);
             int maxSteps = (int)Math.Ceiling(options.TimeLimit / parameters.Dt);
             for (int i = 0; i < maxSteps; i++)
