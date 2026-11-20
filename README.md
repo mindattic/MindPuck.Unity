@@ -57,7 +57,7 @@ Assets/MindPuck/
 
 ### The core mirrors the web core
 
-`Assets/MindPuck/Core` is a port of `MindPuck/src/core`, one file for one file:
+`Assets/MindPuck/Core` is a port of `MindPuck.Web/src/core`, one file for one file:
 
 | Web (TypeScript) | Unity (C#) | What it holds |
 | --- | --- | --- |

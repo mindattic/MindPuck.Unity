@@ -1,4 +1,4 @@
-// Port of MindPuck/src/core/levelgen.ts.
+// Port of MindPuck.Web/src/core/levelgen.ts.
 using System;
 using System.Collections.Generic;
 

@@ -1,4 +1,4 @@
-// Port of MindPuck/src/core/physics.ts.
+// Port of MindPuck.Web/src/core/physics.ts.
 using System;
 
 namespace MindPuck.Core

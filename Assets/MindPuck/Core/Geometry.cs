@@ -1,4 +1,4 @@
-// Port of MindPuck/src/core/geometry.ts.
+// Port of MindPuck.Web/src/core/geometry.ts.
 using System;
 
 namespace MindPuck.Core

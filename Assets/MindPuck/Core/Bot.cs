@@ -1,4 +1,4 @@
-// Port of MindPuck/src/core/bot.ts.
+// Port of MindPuck.Web/src/core/bot.ts.
 using System;
 
 namespace MindPuck.Core

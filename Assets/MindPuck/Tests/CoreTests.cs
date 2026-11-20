@@ -6,7 +6,7 @@ namespace MindPuck.Tests
 {
     /// <summary>
     /// EditMode tests for the core port. The expected numbers marked "from TS" were printed by the
-    /// TypeScript implementation (MindPuck/src/core, bundled by tools/levels.mjs and run with node).
+    /// TypeScript implementation (MindPuck.Web/src/core, bundled by tools/levels.mjs and run with node).
     /// </summary>
     public sealed class RngTests
     {

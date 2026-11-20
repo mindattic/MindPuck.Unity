@@ -1,4 +1,4 @@
-// Port of MindPuck/src/core/navgrid.ts.
+// Port of MindPuck.Web/src/core/navgrid.ts.
 using System;
 using System.Collections.Generic;
 
