@@ -4,12 +4,17 @@ using System;
 namespace MindPuck.Core
 {
     /// <summary>
-    /// What the gaze does to the puck. Attract (magnetic) pulls the puck to where you look.
+    /// What the gaze does to the puck.
+    /// Attract (magnetic) pulls the puck to where you look.
+    /// Steer drives the puck toward the side of it you look at: look at its right edge and it goes
+    /// right. You keep your eyes on the puck the whole time.
     /// Repel pushes it away: look where you do not want it to go.
+    /// The order here is the order F1 steps through (GAZE_MODES in TS).
     /// </summary>
     public enum GazeMode
     {
         Attract,
+        Steer,
         Repel,
     }
 
@@ -30,6 +35,14 @@ namespace MindPuck.Core
         public double PullSoftness = 1.5;
         /// <summary>Magnetic mode: extra drag while the gaze holds the puck, which stops it circling the point it is pulled to.</summary>
         public double PullDrag = 3.5;
+        /// <summary>Steer mode: the drive when you look at the edge of the puck or just beyond it.</summary>
+        public double SteerStrength = 9;
+        /// <summary>Steer mode: the drive builds from nothing at the centre of the puck to full at this many puck radii out.</summary>
+        public double SteerFull = 1.5;
+        /// <summary>Steer mode: beyond this many puck radii the drive fades, so looking away lets the puck coast.</summary>
+        public double SteerRange = 4;
+        /// <summary>Steer mode: extra drag while steering, which keeps the speed manageable.</summary>
+        public double SteerDrag = 1.2;
         /// <summary>Air drag: the fraction of speed lost per second while gliding.</summary>
         public double Drag = 0.55;
         /// <summary>Drag on the goal pad, which is what lets the puck come to rest there.</summary>
@@ -77,6 +90,27 @@ namespace MindPuck.Core
         public static double PullAccel(double d, PhysicsParams p)
         {
             return p.PullStrength * Math.Min(d / p.PullSoftness, 1);
+        }
+
+        /// <summary>
+        /// Steer mode: how hard the puck is driven toward a gaze point at distance d from its centre.
+        /// Nothing at the centre (so looking straight at the puck lets it rest), full from the edge
+        /// outward, fading to nothing well away from the puck.
+        /// </summary>
+        public static double SteerAccel(double d, double puckRadius, PhysicsParams p)
+        {
+            double inner = p.DeadZone * puckRadius;
+            double full = p.SteerFull * puckRadius;
+            double far = p.SteerRange * puckRadius;
+            double fade = far * 1.5;
+            if (d <= inner || d >= fade) return 0;
+            if (d < full)
+            {
+                double u = (d - inner) / (full - inner);
+                return p.SteerStrength * u * u * (3 - 2 * u);
+            }
+            if (d <= far) return p.SteerStrength;
+            return p.SteerStrength * (1 - (d - far) / (fade - far));
         }
 
         /// <summary>The win radius: how close the centre of the puck must be to the centre of the goal.</summary>
@@ -177,7 +211,10 @@ namespace MindPuck.Core
                 if (d > 1e-9)
                 {
                     // Repel pushes along the line from the gaze point to the puck; attract pulls back along it.
-                    double a = Mode == GazeMode.Attract ? -Physics.PullAccel(d, p) : Physics.RepelAccel(d, r, p);
+                    // Steer drives the same way attract pulls, but only while the gaze is on or near the puck.
+                    double a = Mode == GazeMode.Attract ? -Physics.PullAccel(d, p)
+                        : Mode == GazeMode.Steer ? -Physics.SteerAccel(d, r, p)
+                        : Physics.RepelAccel(d, r, p);
                     ax = (dx / d) * a;
                     ay = (dy / d) * a;
                 }
@@ -190,8 +227,8 @@ namespace MindPuck.Core
             double gx = Pos.X - lv.Goal.X;
             double gy = Pos.Y - lv.Goal.Y;
             double goalDist = Geometry.Hypot(gx, gy);
-            bool held = gaze.HasValue && Mode == GazeMode.Attract;
-            double damp = Math.Exp(-((goalDist < lv.Goal.R ? p.PadDrag : p.Drag) + (held ? p.PullDrag : 0)) * dt);
+            double extra = !gaze.HasValue ? 0 : Mode == GazeMode.Attract ? p.PullDrag : Mode == GazeMode.Steer ? p.SteerDrag : 0;
+            double damp = Math.Exp(-((goalDist < lv.Goal.R ? p.PadDrag : p.Drag) + extra) * dt);
             Vel.X *= damp;
             Vel.Y *= damp;
             double speed = Geometry.Hypot(Vel.X, Vel.Y);

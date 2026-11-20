@@ -48,11 +48,13 @@ namespace MindPuck.Core
         public double Par;
         /// <summary>The same for magnetic mode.</summary>
         public double ParAttract;
+        /// <summary>The same for steer mode.</summary>
+        public double ParSteer;
 
         /// <summary>The time to beat in the given mode.</summary>
         public double ParFor(GazeMode mode)
         {
-            return mode == GazeMode.Attract ? ParAttract : Par;
+            return mode == GazeMode.Attract ? ParAttract : mode == GazeMode.Steer ? ParSteer : Par;
         }
         /// <summary>How many candidates were generated before one passed the solver.</summary>
         public int Attempts;

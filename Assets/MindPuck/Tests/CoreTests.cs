@@ -172,6 +172,53 @@ namespace MindPuck.Tests
         }
 
         [Test]
+        public void SteerAccel_IsZeroAtTheCentreFullAtTheEdgeAndFadesFarAway()
+        {
+            PhysicsParams p = PhysicsParams.Default;
+            double r = Level.PuckR;
+            Assert.AreEqual(0, Physics.SteerAccel(0, r, p));
+            Assert.AreEqual(0, Physics.SteerAccel(p.DeadZone * r, r, p));
+            Assert.AreEqual(p.SteerStrength / 2, Physics.SteerAccel((p.DeadZone + p.SteerFull) / 2 * r, r, p), 1e-9);
+            Assert.AreEqual(p.SteerStrength, Physics.SteerAccel(p.SteerFull * r, r, p), 1e-12);
+            Assert.AreEqual(p.SteerStrength, Physics.SteerAccel(p.SteerRange * r, r, p), 1e-12);
+            Assert.AreEqual(p.SteerStrength / 2, Physics.SteerAccel(p.SteerRange * 1.25 * r, r, p), 1e-9);
+            Assert.AreEqual(0, Physics.SteerAccel(p.SteerRange * 1.5 * r, r, p));
+            Assert.AreEqual(0, Physics.SteerAccel(10, r, p));
+        }
+
+        [Test]
+        public void Steer_DrivesThePuckTowardTheSideLookedAt()
+        {
+            PhysicsParams p = PhysicsParams.Default;
+            var sim = new PuckSim(OpenLevel());
+            sim.Mode = GazeMode.Steer;
+            // Looking at the right edge of the puck sends it right, at full strength.
+            sim.Step(new Vec(2 + Level.PuckR * 2, 4.5));
+            Assert.AreEqual(p.SteerStrength, sim.Push.X, 1e-9);
+            Assert.AreEqual(0, sim.Push.Y, 1e-12);
+            Assert.Greater(sim.Vel.X, 0);
+
+            // Looking straight at the puck, or far away from it, does not drive it.
+            var still = new PuckSim(OpenLevel());
+            still.Mode = GazeMode.Steer;
+            still.Step(new Vec(2, 4.5));
+            still.Step(new Vec(12, 4.5));
+            Assert.AreEqual(0, still.Vel.X);
+            Assert.AreEqual(0, still.Vel.Y);
+        }
+
+        [Test]
+        public void Steer_AddsSteerDragWhileAGazeIsPresent()
+        {
+            PhysicsParams p = PhysicsParams.Default;
+            var sim = new PuckSim(OpenLevel());
+            sim.Mode = GazeMode.Steer;
+            sim.Vel = new Vec(5, 0);
+            sim.Step(new Vec(2, 4.5));
+            Assert.AreEqual(5 * Math.Exp(-(p.Drag + p.SteerDrag) * p.Dt) - p.Friction * p.Dt, sim.Vel.X, 1e-9);
+        }
+
+        [Test]
         public void NoGaze_LeavesTheRestingPuckAlone()
         {
             var sim = new PuckSim(OpenLevel());
@@ -344,6 +391,13 @@ namespace MindPuck.Tests
             Assert.IsTrue(pulled.Solved);
             Assert.AreEqual(level.ParAttract, pulled.Time, 0.051);
             Assert.AreEqual(level.ParAttract, level.ParFor(GazeMode.Attract));
+
+            // And in steer mode.
+            Assert.Greater(level.ParSteer, 0);
+            SolveResult steered = Solver.SolveLevel(level, PhysicsParams.Default, options.With(options.Seed, GazeMode.Steer), grid);
+            Assert.IsTrue(steered.Solved);
+            Assert.AreEqual(level.ParSteer, steered.Time, 0.051);
+            Assert.AreEqual(level.ParSteer, level.ParFor(GazeMode.Steer));
             Assert.AreEqual(level.Par, level.ParFor(GazeMode.Repel));
         }
 
@@ -354,6 +408,7 @@ namespace MindPuck.Tests
             Level b = LevelGen.GenerateLevel(3, 4);
             Assert.AreEqual(a.Par, b.Par);
             Assert.AreEqual(a.ParAttract, b.ParAttract);
+            Assert.AreEqual(a.ParSteer, b.ParSteer);
             Assert.AreEqual(a.Attempts, b.Attempts);
             Assert.AreEqual(a.Obstacles.Length, b.Obstacles.Length);
             Assert.AreEqual(a.Start.X, b.Start.X);

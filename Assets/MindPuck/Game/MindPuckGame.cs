@@ -52,8 +52,42 @@ namespace MindPuck.Game
         private PuckSim sim;
         private SolverBot bot;
         private bool botMode;
-        /// <summary>Magnetic (attract) is the default. F1 switches; the choice is remembered in PlayerPrefs.</summary>
+        /// <summary>Magnetic (attract) is the default. F1 steps to the next; the choice is remembered in PlayerPrefs.</summary>
         private GazeMode mode = GazeMode.Attract;
+
+        /// <summary>The order F1 steps through (GAZE_MODES in TS).</summary>
+        private static readonly GazeMode[] Modes = { GazeMode.Attract, GazeMode.Steer, GazeMode.Repel };
+
+        private static string ModeId(GazeMode m)
+        {
+            return m == GazeMode.Attract ? "attract" : m == GazeMode.Steer ? "steer" : "repel";
+        }
+
+        private static string ModeName(GazeMode m)
+        {
+            return m == GazeMode.Attract ? "Magnetic" : m == GazeMode.Steer ? "Steer" : "Repulsor";
+        }
+
+        private static string ModeHelp(GazeMode m)
+        {
+            return m == GazeMode.Attract ? "Magnetic: the puck goes to where you look."
+                : m == GazeMode.Steer ? "Steer: look at the edge of the puck on the side it should go. Look at its centre to let it be."
+                : "Repulsor: the puck is pushed away from where you look.";
+        }
+
+        private static bool TryParseMode(string id, out GazeMode m)
+        {
+            foreach (GazeMode candidate in Modes)
+            {
+                if (ModeId(candidate) == id)
+                {
+                    m = candidate;
+                    return true;
+                }
+            }
+            m = GazeMode.Attract;
+            return false;
+        }
         private double botAccumulator;
         private float holdLeft;
         private float goalLeft;
@@ -91,7 +125,8 @@ namespace MindPuck.Game
             tracker.Sample += OnSample;
             gaze.SetActive(true);
 
-            if (PlayerPrefs.GetString(ModeKey, "attract") == "repel") mode = GazeMode.Repel;
+            GazeMode saved;
+            if (TryParseMode(PlayerPrefs.GetString(ModeKey, "attract"), out saved)) mode = saved;
             ReadArguments();
             LoadLevel(startLevel);
         }
@@ -100,7 +135,7 @@ namespace MindPuck.Game
         //
         // Command-line switches for checking a player build without a person at the keyboard:
         //   -mindpuck-bot                  start with the bot demo on
-        //   -mindpuck-mode attract|repel   play magnetic or repulsor this run (not remembered)
+        //   -mindpuck-mode attract|steer|repel   play that control scheme this run (not remembered)
         //   -mindpuck-calibrate            start a calibration as soon as a tracker sends gaze
         //   -mindpuck-level <n>            start on level n (counted from one)
         //   -mindpuck-shot <file.png>      save a screenshot, then quit
@@ -136,8 +171,8 @@ namespace MindPuck.Game
                         botMode = true;
                         break;
                     case "-mindpuck-mode":
-                        if (next == "attract") mode = GazeMode.Attract;
-                        else if (next == "repel") mode = GazeMode.Repel;
+                        GazeMode asked;
+                        if (next != null && TryParseMode(next, out asked)) mode = asked;
                         break;
                     case "-mindpuck-calibrate":
                         calibrateAtLaunch = true;
@@ -400,7 +435,7 @@ namespace MindPuck.Game
                     goalLeft = GoalSeconds;
                     var invariant = System.Globalization.CultureInfo.InvariantCulture;
                     Debug.Log("MindPuck: win level " + (levelIndex + 1) + " time " + sim.Time.ToString("0.00", invariant) +
-                        " par " + level.ParFor(mode).ToString("0.0", invariant) + " mode " + (mode == GazeMode.Attract ? "attract" : "repel") + " source " + Source());
+                        " par " + level.ParFor(mode).ToString("0.0", invariant) + " mode " + ModeId(mode) + " source " + Source());
                 }
             }
 
@@ -479,17 +514,15 @@ namespace MindPuck.Game
             }
         }
 
-        /// <summary>Switch between magnetic and repulsor, remember it, and start the attempt again.</summary>
+        /// <summary>Step to the next control scheme, remember it, and start the attempt again.</summary>
         private void ToggleMode()
         {
-            mode = mode == GazeMode.Attract ? GazeMode.Repel : GazeMode.Attract;
-            PlayerPrefs.SetString(ModeKey, mode == GazeMode.Attract ? "attract" : "repel");
+            mode = Modes[(Array.IndexOf(Modes, mode) + 1) % Modes.Length];
+            PlayerPrefs.SetString(ModeKey, ModeId(mode));
             PlayerPrefs.Save();
-            calibrationNote = mode == GazeMode.Attract
-                ? "Magnetic: the puck goes to where you look."
-                : "Repulsor: the puck is pushed away from where you look.";
+            calibrationNote = ModeHelp(mode);
             calibrationNoteUntil = Time.unscaledTime + 4f;
-            Debug.Log("MindPuck: mode " + (mode == GazeMode.Attract ? "attract" : "repel"));
+            Debug.Log("MindPuck: mode " + ModeId(mode));
             StartAttempt();
         }
 
@@ -538,7 +571,6 @@ namespace MindPuck.Game
             {
                 top += "    Time " + sim.Time.ToString("0.0") + " s    Par " + level.ParFor(mode).ToString("0.0") + " s";
             }
-            top += "    " + (mode == GazeMode.Attract ? "Magnetic" : "Repulsor");
             Shadowed(new Rect(pad, pad, width, line), top, hudStyle, Color.white);
             Shadowed(new Rect(pad, pad + line, width, line), SourceStatus(), hintStyle, new Color(0.75f, 0.85f, 1f));
             if (calibrationNote != null && Time.unscaledTime < calibrationNoteUntil)
@@ -546,9 +578,11 @@ namespace MindPuck.Game
                 Shadowed(new Rect(pad, pad + line * 2f, width, line), calibrationNote, hintStyle, new Color(0.75f, 0.85f, 1f));
             }
 
-            string hints = "F1 " + (mode == GazeMode.Attract ? "repulsor" : "magnetic") + "    R restart    N skip    B bot demo " + (botMode ? "(on)" : "(off)") +
-                "    C calibrate    M mouse stand-in " + (tracker.useMouseFallback ? "(on)" : "(off)");
-            Shadowed(new Rect(pad, Screen.height - pad - line, width, line), hints, hintStyle, new Color(1f, 1f, 1f, 0.75f));
+            // The key hints sit at the top right, clear of the mode label at the bottom centre.
+            string hints = "F1 mode    R restart    N skip    B bot " + (botMode ? "(on)" : "(off)") +
+                "    C calibrate    M mouse " + (tracker.useMouseFallback ? "(on)" : "(off)");
+            Shadowed(new Rect(pad, pad, width, line), hints, RightHint(), new Color(1f, 1f, 1f, 0.75f));
+            DrawModeLabel(scale);
 
             var centre = new Rect(0f, Screen.height * 0.3f, Screen.width, 130f * scale);
             var below = new Rect(0f, centre.yMax, Screen.width, line);
@@ -564,9 +598,9 @@ namespace MindPuck.Game
             }
             else if (holdLeft > 0f)
             {
-                string how = mode == GazeMode.Attract
-                    ? "Look where you want the puck to go. F1 switches to the repulsor."
-                    : "Look behind the puck to push it. Look far away to let it glide. F1 switches to magnetic.";
+                string how = mode == GazeMode.Attract ? "Look where you want the puck to go."
+                    : mode == GazeMode.Steer ? "Look at the edge of the puck on the side it should go. Look at its centre to let it be."
+                    : "Look behind the puck to push it. Look far away to let it glide.";
                 Shadowed(below, how, CentredHud(), new Color(1f, 1f, 1f, 0.8f));
             }
 
@@ -575,10 +609,60 @@ namespace MindPuck.Game
             {
                 float size = 10f * scale;
                 Color old = GUI.color;
-                GUI.color = mode == GazeMode.Attract ? new Color(1f, 0.45f, 0.75f, 0.9f) : new Color(0.5f, 0.83f, 1f, 0.9f);
+                Color dotColour = TableView.ModeColor(mode);
+                GUI.color = new Color(dotColour.r, dotColour.g, dotColour.b, 0.9f);
                 GUI.DrawTexture(new Rect(reticleScreen.x - size / 2, reticleScreen.y - size / 2, size, size), dotTexture);
                 GUI.color = old;
             }
+        }
+
+        /// <summary>
+        /// The label at the bottom centre always says which control scheme is live:
+        /// "Mode 2 of 3  STEER  F1 next", the name in the colour of the mode.
+        /// </summary>
+        private void DrawModeLabel(float scale)
+        {
+            if (modeNameStyle == null)
+            {
+                modeNameStyle = new GUIStyle(hudStyle) { alignment = TextAnchor.MiddleCenter };
+                modeSideStyle = new GUIStyle(hintStyle) { alignment = TextAnchor.MiddleCenter };
+            }
+            modeNameStyle.fontSize = Mathf.RoundToInt(24f * scale);
+            modeSideStyle.fontSize = Mathf.RoundToInt(15f * scale);
+
+            string left = "Mode " + (Array.IndexOf(Modes, mode) + 1) + " of " + Modes.Length;
+            string name = ModeName(mode).ToUpperInvariant();
+            const string right = "F1 next";
+            float gap = 14f * scale;
+            float leftW = modeSideStyle.CalcSize(new GUIContent(left)).x;
+            float nameW = modeNameStyle.CalcSize(new GUIContent(name)).x;
+            float rightW = modeSideStyle.CalcSize(new GUIContent(right)).x;
+            float inner = leftW + gap + nameW + gap + rightW;
+            float height = 36f * scale;
+            float padX = 18f * scale;
+            var box = new Rect((Screen.width - inner) / 2f - padX, Screen.height - height - 8f * scale, inner + padX * 2f, height);
+
+            Color old = GUI.color;
+            GUI.color = new Color(0.03f, 0.05f, 0.1f, 0.85f);
+            GUI.DrawTexture(box, Texture2D.whiteTexture);
+            GUI.color = old;
+            float x = box.x + padX;
+            Shadowed(new Rect(x, box.y, leftW, height), left, modeSideStyle, new Color(1f, 1f, 1f, 0.7f));
+            x += leftW + gap;
+            Shadowed(new Rect(x, box.y, nameW, height), name, modeNameStyle, TableView.ModeColor(mode));
+            x += nameW + gap;
+            Shadowed(new Rect(x, box.y, rightW, height), right, modeSideStyle, new Color(1f, 1f, 1f, 0.7f));
+        }
+
+        private GUIStyle modeNameStyle;
+        private GUIStyle modeSideStyle;
+        private GUIStyle rightHint;
+
+        private GUIStyle RightHint()
+        {
+            if (rightHint == null) rightHint = new GUIStyle(hintStyle) { alignment = TextAnchor.MiddleRight };
+            rightHint.fontSize = hintStyle.fontSize;
+            return rightHint;
         }
 
         private GUIStyle centredHud;

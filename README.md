@@ -1,14 +1,16 @@
 # MindPuck.Unity
 
 MindPuck in Unity. A puck sits on an air-hockey table and your eyes move it. Bring it to rest on
-the goal pad to win the level. There are two modes, and **F1** switches between them:
+the goal pad to win the level. There are three control schemes, and **F1** steps through them:
 
 - **Magnetic** (the default): the point you look at pulls the puck. Look where you want it to go.
+- **Steer**: look at the edge of the puck on the side it should go, and it travels that way. Look at
+  its centre to let it be. Your eyes stay on the puck the whole time.
 - **Repulsor**: the point you look at **repels** the puck, like a black hole in reverse. Look where
   you do not want the puck to go, and look far away to let it glide.
 
 Levels are generated from a seed and get harder as you go. Every level is played and won by a solver
-bot, with an unsteady gaze, in both modes, before you see it, so every level can be won either way.
+bot, with an unsteady gaze, in all three modes, before you see it, so every level can be won each way.
 The time the bot took in the current mode is shown as par.
 
 This is the Unity version of [MindPuck.Web](../MindPuck.Web) (the web game). Gaze comes from
@@ -27,7 +29,8 @@ Unity 6000.4.3f1. The project expects `MindAttic.EyeTracker` to be cloned next t
    ```
 2. Open the tracker page, `http://localhost:8787/tracker/`, and allow the camera.
 3. Open this project in Unity, open `Assets/MindPuck/Scenes/MindPuck.unity`, and press Play.
-4. Press **C** to calibrate: look at each of the nine dots until it fills.
+4. Press **C** to calibrate: look at each of the nine dots until it fills, then follow the three
+   amber head-movement steps (eyes on the dot, move your head).
 
 You can skip steps 1, 2 and 4. With no tracker connected, the mouse pointer stands in for your gaze,
 so the game is playable without a camera or a bridge.
@@ -36,15 +39,17 @@ so the game is playable without a camera or a bridge.
 
 | Key | Does |
 | --- | --- |
-| F1 | Switch between magnetic and repulsor. Restarts the attempt; the choice is remembered |
+| F1 | Step to the next control scheme: magnetic, steer, repulsor. Restarts the attempt; the choice is remembered |
 | R | Restart the level |
 | N | Skip to the next level |
 | B | Bot demo on or off: the solver bot plays the level live |
 | C | Calibrate the eye tracker (Esc cancels) |
 | M | Mouse stand-in on or off. On is the default, and it only takes over while no tracker is connected |
 
-The HUD shows the level number, your time, par, the mode, and where the gaze is coming from. While it says
-"waiting for tracker", open the tracker page.
+The HUD shows the level number, your time, par, and where the gaze is coming from. While it says
+"waiting for tracker", open the tracker page. A label at the bottom centre always names the live
+control scheme, for example "Mode 2 of 3  STEER  F1 next", with the name in the colour of the mode
+(pink magnetic, green steer, blue repulsor). The gaze reticle uses the same colour.
 
 At the start of every attempt the puck is held still for 0.9 seconds, so you can find it before
 your gaze starts pushing it. The clock does not run during the hold.
@@ -68,7 +73,7 @@ Assets/MindPuck/
 | `rng.ts` | `Rng.cs` | mulberry32, mixSeed, range, gaussian |
 | `geometry.ts` | `Geometry.cs` | `Vec`, polygon tests and distances, the obstacle shapes |
 | `level.ts` | `Level.cs` | the table constants and the `Level` record |
-| `physics.ts` | `Physics.cs` | `GazeMode`, `PhysicsParams`, `RepelAccel`, `PullAccel`, `PuckSim` |
+| `physics.ts` | `Physics.cs` | `GazeMode`, `PhysicsParams`, `RepelAccel`, `PullAccel`, `SteerAccel`, `PuckSim` |
 | `navgrid.ts` | `NavGrid.cs` | the free-cell grid and A* |
 | `bot.ts` | `Bot.cs` | `SolverBot`, `Solver.SolveLevel` |
 | `levelgen.ts` | `LevelGen.cs` | `GenerateLevel`, with the solver as the check |
@@ -133,7 +138,7 @@ The player takes a few switches for checking it without a person at the keyboard
 | Switch | Does |
 | --- | --- |
 | `-mindpuck-bot` | Start with the bot demo on |
-| `-mindpuck-mode attract\|repel` | Play magnetic or repulsor for this run, without changing the remembered choice |
+| `-mindpuck-mode attract\|steer\|repel` | Play that control scheme for this run, without changing the remembered choice |
 | `-mindpuck-calibrate` | Start a calibration as soon as a tracker sends gaze |
 | `-mindpuck-level <n>` | Start on level n, counted from one |
 | `-mindpuck-shot <file.png>` | Save a screenshot, then quit |

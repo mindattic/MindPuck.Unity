@@ -55,6 +55,11 @@ namespace MindPuck.Core
         private const int DecideEvery = 4; // simulation steps between decisions: 30 a second at 120 steps a second
         private const int ReplanEvery = 60; // simulation steps between route searches: twice a second
         private const double MinStandoff = 0.8;
+        /// <summary>
+        /// Steer mode: how far from the centre of the puck the bot looks, in puck radii. Far enough that
+        /// its unsteady gaze still points the right way.
+        /// </summary>
+        private const double SteerStandoff = 2.6;
 
         /// <summary>Where the bot is looking, noise included: what the simulation is given.</summary>
         public Vec Gaze;
@@ -170,11 +175,29 @@ namespace MindPuck.Core
             double ax = (tx * wanted - vel.X) * 3;
             double ay = (ty * wanted - vel.Y) * 3;
             double a = Geometry.Hypot(ax, ay);
+
+            // Steer: look at the side of the puck it should accelerate toward, or straight at it to let it be.
+            if (options.Mode == GazeMode.Steer)
+            {
+                if (a < 0.6)
+                {
+                    aim.X = pos.X;
+                    aim.Y = pos.Y;
+                }
+                else
+                {
+                    double reach = lv.PuckRadius * SteerStandoff;
+                    aim.X = pos.X + (ax / a) * reach;
+                    aim.Y = pos.Y + (ay / a) * reach;
+                }
+                return;
+            }
             if (a < 0.08)
             {
                 aim = FarCorner(pos);
                 return;
             }
+
             ax /= a;
             ay /= a;
             a = Math.Min(a, 18);

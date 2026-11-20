@@ -37,7 +37,14 @@ namespace MindPuck.Game
         private Transform reticleDot;
         private readonly Transform[] reticleRings = new Transform[2];
         private readonly Material[] ringMaterials = new Material[2];
-        private static readonly Color PullColor = new Color(1f, 0.45f, 0.75f);
+
+        /// <summary>The colour that stands for a control scheme: pink magnetic, green steer, blue repulsor.</summary>
+        public static Color ModeColor(GazeMode mode)
+        {
+            return mode == GazeMode.Attract ? new Color(1f, 0.604f, 0.835f)
+                : mode == GazeMode.Steer ? new Color(0.373f, 0.89f, 0.631f)
+                : new Color(0.498f, 0.831f, 1f);
+        }
 
         public static Vector3 ToWorld(Vec p, float height = 0f)
         {
@@ -162,15 +169,16 @@ namespace MindPuck.Game
         /// <summary>
         /// Show the reticle at a table point, or hide it with null. A faint one means the gaze is not
         /// acting on the puck. Repulsor: blue rings moving outward. Magnetic: pink rings moving inward
-        /// and a smaller dot.
+        /// and a smaller dot. Steer: green and small, because the gaze stays on the puck.
         /// </summary>
         public void SetReticle(Vec? point, bool acting, GazeMode mode)
         {
             reticle.gameObject.SetActive(point.HasValue);
             if (!point.HasValue) return;
             reticle.localPosition = ToWorld(point.Value);
-            bool pull = mode == GazeMode.Attract;
-            Color colour = pull ? PullColor : ReticleColor;
+            bool pull = mode != GazeMode.Repel;
+            Color colour = ModeColor(mode);
+            float size = mode == GazeMode.Steer ? 0.55f : 1f;
             float strength = acting ? 1f : 0.35f;
             reticleMaterial.color = new Color(colour.r, colour.g, colour.b, 0.95f * strength);
             float dot = pull ? 0.6f : 1f;
@@ -180,7 +188,7 @@ namespace MindPuck.Game
                 // Each ring runs from the centre to the rim (or back), fading as it goes out.
                 float phase = Mathf.Repeat(Time.unscaledTime * 0.9f + (float)i / reticleRings.Length, 1f);
                 float travel = pull ? 1f - phase : phase;
-                float scale = Mathf.Lerp(0.35f, 1.6f, travel);
+                float scale = Mathf.Lerp(0.35f, 1.6f, travel) * size;
                 reticleRings[i].localScale = new Vector3(scale, 1f, scale);
                 ringMaterials[i].color = new Color(colour.r, colour.g, colour.b, Mathf.Lerp(0.95f, 0.1f, travel) * strength);
             }
