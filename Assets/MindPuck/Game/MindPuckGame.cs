@@ -18,6 +18,11 @@ namespace MindPuck.Game
         /// it before their gaze starts pushing it. HOLD_MS in the web version (src/main.ts).
         /// </summary>
         public const float HoldSeconds = 0.9f;
+        /// <summary>
+        /// Steer mode holds for longer: the hold is also when the game learns where the tracker puts
+        /// the gaze while the player looks at the puck. STEER_HOLD_MS in the web version.
+        /// </summary>
+        public const float SteerHoldSeconds = 1.7f;
         private const float GoalSeconds = 1.6f;
         private const string ModeKey = "mindpuck.mode";
         private const string TrackerPage = "http://localhost:8787/tracker/";
@@ -90,6 +95,18 @@ namespace MindPuck.Game
         }
         private double botAccumulator;
         private float holdLeft;
+
+        /// <summary>
+        /// Steer mode works from where the gaze is relative to the puck, and an eye tracker is rarely
+        /// accurate to within the width of a puck. But in steer mode the player is, by definition,
+        /// looking at the puck. So the game measures the standing offset between the gaze point and the
+        /// puck and takes it out: quickly while the puck is held at the start, slowly during play. What
+        /// is left is the part that matters, the small movement of the eyes toward one edge of the puck.
+        /// It is kept from attempt to attempt, as on the web.
+        /// </summary>
+        private Vec steerOffset;
+        /// <summary>One calibration hint is sent per attempt, just before the hold ends.</summary>
+        private bool hinted;
         private float goalLeft;
         private string calibrationNote;
         private float calibrationNoteUntil;
@@ -103,6 +120,11 @@ namespace MindPuck.Game
 
         private void Awake()
         {
+            // The switches first: one of them can change the bridge address the tracker connects to.
+            GazeMode saved;
+            if (TryParseMode(PlayerPrefs.GetString(ModeKey, "attract"), out saved)) mode = saved;
+            ReadArguments();
+
             BuildCamera();
             BuildLight();
 
@@ -125,9 +147,6 @@ namespace MindPuck.Game
             tracker.Sample += OnSample;
             gaze.SetActive(true);
 
-            GazeMode saved;
-            if (TryParseMode(PlayerPrefs.GetString(ModeKey, "attract"), out saved)) mode = saved;
-            ReadArguments();
             LoadLevel(startLevel);
         }
 
@@ -138,16 +157,17 @@ namespace MindPuck.Game
         //   -mindpuck-mode attract|steer|repel   play that control scheme this run (not remembered)
         //   -mindpuck-calibrate            start a calibration as soon as a tracker sends gaze
         //   -mindpuck-level <n>            start on level n (counted from one)
-        //   -mindpuck-shot <file.png>      save a screenshot, then quit
-        //   -mindpuck-shot-after <seconds> when to take it (default 5)
+        //   -mindpuck-bridge <url>         connect to this bridge instead of the one set on the component
+        //   -mindpuck-shot <file.png>      save a screenshot; quit after the last one. May be repeated.
+        //   -mindpuck-shot-after <seconds> when to take the screenshot named just before it (default 5)
         //   -mindpuck-quit-after <seconds> quit after this long, with or without a screenshot
         // The game also logs one line when the tracker count changes, when the first gaze sample
         // arrives, when a calibration ends and on each win. Every line starts with "MindPuck:".
 
-        private string shotPath;
-        private float shotAfter = 5f;
+        private readonly System.Collections.Generic.List<string> shotPaths = new System.Collections.Generic.List<string>();
+        private readonly System.Collections.Generic.List<float> shotTimes = new System.Collections.Generic.List<float>();
+        private int shotsTaken;
         private float quitAfter = -1f;
-        private bool shotTaken;
         private float quitAt = -1f;
         private bool calibrateAtLaunch;
         private float startedAt;
@@ -174,6 +194,9 @@ namespace MindPuck.Game
                         GazeMode asked;
                         if (next != null && TryParseMode(next, out asked)) mode = asked;
                         break;
+                    case "-mindpuck-bridge":
+                        if (!string.IsNullOrEmpty(next)) bridgeUrl = next;
+                        break;
                     case "-mindpuck-calibrate":
                         calibrateAtLaunch = true;
                         break;
@@ -181,10 +204,14 @@ namespace MindPuck.Game
                         if (next != null && int.TryParse(next, System.Globalization.NumberStyles.Integer, invariant, out number)) startLevel = Mathf.Max(0, number - 1);
                         break;
                     case "-mindpuck-shot":
-                        shotPath = next;
+                        if (next != null)
+                        {
+                            shotPaths.Add(next);
+                            shotTimes.Add(5f);
+                        }
                         break;
                     case "-mindpuck-shot-after":
-                        if (next != null && float.TryParse(next, System.Globalization.NumberStyles.Float, invariant, out seconds)) shotAfter = seconds;
+                        if (next != null && float.TryParse(next, System.Globalization.NumberStyles.Float, invariant, out seconds) && shotTimes.Count > 0) shotTimes[shotTimes.Count - 1] = seconds;
                         break;
                     case "-mindpuck-quit-after":
                         if (next != null && float.TryParse(next, System.Globalization.NumberStyles.Float, invariant, out seconds)) quitAfter = seconds;
@@ -214,15 +241,15 @@ namespace MindPuck.Game
             }
 
             float elapsed = Time.realtimeSinceStartup - startedAt;
-            if (shotPath != null && !shotTaken && elapsed >= shotAfter)
+            if (shotsTaken < shotPaths.Count && elapsed >= shotTimes[shotsTaken])
             {
-                shotTaken = true;
-                ScreenCapture.CaptureScreenshot(shotPath);
-                Debug.Log("MindPuck: screenshot " + shotPath);
+                string path = shotPaths[shotsTaken++];
+                ScreenCapture.CaptureScreenshot(path);
+                Debug.Log("MindPuck: screenshot " + path);
                 // The file is written at the end of the frame; leave a moment before quitting.
-                quitAt = Time.realtimeSinceStartup + 1f;
+                if (shotsTaken == shotPaths.Count) quitAt = Time.realtimeSinceStartup + 1f;
             }
-            if (quitAfter >= 0f && quitAt < 0f && elapsed >= quitAfter && (shotPath == null || shotTaken)) quitAt = Time.realtimeSinceStartup;
+            if (quitAfter >= 0f && quitAt < 0f && elapsed >= quitAfter && shotsTaken == shotPaths.Count) quitAt = Time.realtimeSinceStartup;
             if (quitAt >= 0f && Time.realtimeSinceStartup >= quitAt)
             {
                 quitAt = float.MaxValue;
@@ -367,7 +394,8 @@ namespace MindPuck.Game
                 BotOptions options = BotOptions.Default.With(Rng.MixSeed(level.Seed, level.Index, 1000 + level.Attempts - 1), mode);
                 bot = new SolverBot(level, sim.Params, options);
             }
-            holdLeft = HoldSeconds;
+            holdLeft = mode == GazeMode.Steer ? SteerHoldSeconds : HoldSeconds;
+            hinted = false;
             state = State.Playing;
             table.SetPuck(sim.Pos);
             table.SetGoalProgress(0f);
@@ -401,6 +429,36 @@ namespace MindPuck.Game
             }
 
             bool paused = calibrator.IsRunning;
+            bool held = state == State.Playing && !paused && holdLeft > 0f;
+
+            // Steer anchoring. The player's gaze only: the bot needs no correction.
+            if (mode == GazeMode.Steer && bot == null && sim != null && state != State.Loading && !paused)
+            {
+                if (gaze.HasValue)
+                {
+                    double elapsed = Math.Min(Time.deltaTime, 0.1);
+                    double ox = gaze.Value.X - sim.Pos.X;
+                    double oy = gaze.Value.Y - sim.Pos.Y;
+                    // Fast while the puck waits at the start (the player is finding it), slow in play, so that
+                    // a deliberate look at one edge is not absorbed before it has done its work.
+                    double follow = 1 - Math.Exp(-elapsed / (held ? 0.3 : 6));
+                    if (held || Geometry.Hypot(ox - steerOffset.X, oy - steerOffset.Y) < 4)
+                    {
+                        steerOffset.X += (ox - steerOffset.X) * follow;
+                        steerOffset.Y += (oy - steerOffset.Y) * follow;
+                    }
+                    gaze = new Vec(gaze.Value.X - steerOffset.X, gaze.Value.Y - steerOffset.Y);
+                    // The player is looking at the puck: that is a free calibration point for the tracker.
+                    if (held && !hinted && holdLeft < 0.5f)
+                    {
+                        hinted = true;
+                        Vector3 at = cam.WorldToScreenPoint(TableView.ToWorld(sim.Pos));
+                        if (tracker.HintScreenPoint(new Vector2(at.x, at.y), 0.3f)) Debug.Log("MindPuck: steer hint sent");
+                    }
+                }
+                // The reticle is drawn at the corrected point.
+                if (shown.HasValue) shown = new Vec(shown.Value.X - steerOffset.X, shown.Value.Y - steerOffset.Y);
+            }
             if (state == State.Won)
             {
                 goalLeft -= Time.deltaTime;

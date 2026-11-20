@@ -38,9 +38,9 @@ namespace MindPuck.Core
         /// <summary>Steer mode: the drive when you look at the edge of the puck or just beyond it.</summary>
         public double SteerStrength = 9;
         /// <summary>Steer mode: the drive builds from nothing at the centre of the puck to full at this many puck radii out.</summary>
-        public double SteerFull = 1.5;
+        public double SteerFull = 2.2;
         /// <summary>Steer mode: beyond this many puck radii the drive fades, so looking away lets the puck coast.</summary>
-        public double SteerRange = 4;
+        public double SteerRange = 6;
         /// <summary>Steer mode: extra drag while steering, which keeps the speed manageable.</summary>
         public double SteerDrag = 1.2;
         /// <summary>Air drag: the fraction of speed lost per second while gliding.</summary>

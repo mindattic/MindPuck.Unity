@@ -192,8 +192,9 @@ namespace MindPuck.Tests
             PhysicsParams p = PhysicsParams.Default;
             var sim = new PuckSim(OpenLevel());
             sim.Mode = GazeMode.Steer;
-            // Looking at the right edge of the puck sends it right, at full strength.
-            sim.Step(new Vec(2 + Level.PuckR * 2, 4.5));
+            // Looking just past the right edge of the puck, between SteerFull and SteerRange radii out,
+            // sends it right at full strength.
+            sim.Step(new Vec(2 + Level.PuckR * (p.SteerFull + p.SteerRange) / 2, 4.5));
             Assert.AreEqual(p.SteerStrength, sim.Push.X, 1e-9);
             Assert.AreEqual(0, sim.Push.Y, 1e-12);
             Assert.Greater(sim.Vel.X, 0);

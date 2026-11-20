@@ -29,8 +29,8 @@ Unity 6000.4.3f1. The project expects `MindAttic.EyeTracker` to be cloned next t
    ```
 2. Open the tracker page, `http://localhost:8787/tracker/`, and allow the camera.
 3. Open this project in Unity, open `Assets/MindPuck/Scenes/MindPuck.unity`, and press Play.
-4. Press **C** to calibrate: look at each of the nine dots until it fills, then follow the three
-   amber head-movement steps (eyes on the dot, move your head).
+4. Press **C** to calibrate: look at each of the nine dots until it fills, follow the moving dot with
+   your eyes for 24 seconds, then do the three amber head-movement steps (eyes on the dot, move your head).
 
 You can skip steps 1, 2 and 4. With no tracker connected, the mouse pointer stands in for your gaze,
 so the game is playable without a camera or a bridge.
@@ -51,8 +51,16 @@ The HUD shows the level number, your time, par, and where the gaze is coming fro
 control scheme, for example "Mode 2 of 3  STEER  F1 next", with the name in the colour of the mode
 (pink magnetic, green steer, blue repulsor). The gaze reticle uses the same colour.
 
-At the start of every attempt the puck is held still for 0.9 seconds, so you can find it before
-your gaze starts pushing it. The clock does not run during the hold.
+At the start of every attempt the puck is held still for 0.9 seconds (1.7 in steer mode), so you
+can find it before your gaze starts pushing it. The clock does not run during the hold.
+
+Steer mode works from where your gaze is relative to the puck, and a webcam tracker is rarely
+accurate to within the width of a puck. In steer mode you are looking at the puck anyway, so the
+game measures the standing offset between the gaze point and the puck and takes it out: quickly
+during the hold, slowly during play (and not at all while the gaze is more than 4 units from where
+it expects it). What is left is the small movement of your eyes toward one edge of the puck, and
+the reticle is drawn at that corrected point. Just before the hold ends the game also sends the
+tracker one calibration hint: the player is looking at the puck now.
 
 ## How it is built
 
@@ -141,8 +149,9 @@ The player takes a few switches for checking it without a person at the keyboard
 | `-mindpuck-mode attract\|steer\|repel` | Play that control scheme for this run, without changing the remembered choice |
 | `-mindpuck-calibrate` | Start a calibration as soon as a tracker sends gaze |
 | `-mindpuck-level <n>` | Start on level n, counted from one |
-| `-mindpuck-shot <file.png>` | Save a screenshot, then quit |
-| `-mindpuck-shot-after <seconds>` | When to take it (default 5) |
+| `-mindpuck-bridge <url>` | Connect to this bridge instead of `ws://localhost:8787/gaze` |
+| `-mindpuck-shot <file.png>` | Save a screenshot; the game quits after the last one. May be repeated, in time order |
+| `-mindpuck-shot-after <seconds>` | When to take the screenshot named just before it (default 5) |
 | `-mindpuck-quit-after <seconds>` | Quit after this long |
 
 The game logs one line, starting `MindPuck:`, when the tracker count changes, when the first gaze

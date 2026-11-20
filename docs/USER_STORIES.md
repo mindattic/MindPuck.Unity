@@ -24,4 +24,5 @@ _Nothing recorded yet._
 | MPU-T1 | 2026-11-19 | docs | closed | Start the permanent ticket log in the ticket database | — |
 | MPU-T2 | 2026-11-19 | feature | closed | Unity version of MindPuck on the EyeTracker Unity client (MAT-T160) | d6caf79 |
 | MPU-T3 | 2026-11-19 | feature | closed | Gaze now pulls the puck to where you look (magnetic) by default; F1 switches between magnetic and the original repulsor; levels are solver-verified in both modes | c0466cb |
-| MPU-T4 | 2026-11-19 | feature | open | Third gaze mode: look at the edge of the puck and it travels that way, so you keep your eyes on the puck; F1 steps through magnetic, steer and repulsor; levels solver-verified in all three | — |
+| MPU-T4 | 2026-11-19 | feature | closed | Third gaze mode: look at the edge of the puck and it travels that way, so you keep your eyes on the puck; F1 steps through magnetic, steer and repulsor; levels solver-verified in all three | e99f9e2 |
+| MPU-T5 | 2026-11-19 | fix | open | Match the web: steer zone widened to 2.2 to 6 radii (edited, awaiting a build: the heavy-process lease is stuck), and port the shell's steer anchoring (measure and remove the standing gaze offset from the puck) and the follow-the-dot calibration pass | — |
