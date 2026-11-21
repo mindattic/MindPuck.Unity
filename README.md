@@ -14,18 +14,18 @@ bot, with an unsteady gaze, in all three modes, before you see it, so every leve
 The time the bot took in the current mode is shown as par.
 
 This is the Unity version of [MindPuck.Web](../MindPuck.Web) (the web game). Gaze comes from
-[MindAttic.EyeTracker](../MindAttic.EyeTracker): a browser page owns the webcam, a small bridge
+[MindAttic.Webcam](../MindAttic.Webcam): a browser page owns the webcam, a small bridge
 relays the gaze over WebSocket, and this game receives it through the
 `com.mindattic.eyetracker` Unity package. No camera code runs inside Unity.
 
 ## Run
 
-Unity 6000.4.3f1. The project expects `MindAttic.EyeTracker` to be cloned next to it, because
+Unity 6000.4.3f1. The project expects `MindAttic.Webcam` to be cloned next to it, because
 `Packages/manifest.json` takes the gaze package by sibling path.
 
 1. Start the bridge:
    ```
-   cd D:\Projects\MindAttic\MindAttic.EyeTracker; npm run build; npm run bridge
+   cd D:\Projects\MindAttic\MindAttic.Webcam; npm run build; npm run bridge
    ```
 2. Open the tracker page, `http://localhost:8787/tracker/`, and allow the camera.
 3. Open this project in Unity, open `Assets/MindPuck/Scenes/MindPuck.unity`, and press Play.

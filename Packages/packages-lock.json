@@ -1,7 +1,7 @@
 {
   "dependencies": {
     "com.mindattic.eyetracker": {
-      "version": "file:../../MindAttic.EyeTracker/unity/com.mindattic.eyetracker",
+      "version": "file:../../MindAttic.Webcam/unity/com.mindattic.eyetracker",
       "depth": 0,
       "source": "local",
       "dependencies": {
